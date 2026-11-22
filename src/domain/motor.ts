@@ -8,7 +8,7 @@ export type Servicio = {
 };
 export type Propuesta = {
   id: string; servicioId: string; estado: 'Pendiente' | 'Aprobada' | 'Rechazada'; creador: string;
-  cambios: Partial<Servicio>; motivo: string; decididaPor?: string; motivoDecision?: string;
+  cambios: Partial<Servicio>; motivo: string; decididaPor?: string; motivoDecision?: string; revisionBase?: number;
 };
 export type Cierre = { id: string; fecha: string; descripcion: string; ejecutadoPor: string; servicioIds: string[]; propuestaIds: string[] };
 export type Evento = { id: string; comandoId: string; tipo: string; entidadId: string; revision: number; instante: string; actor: string; detalle: Record<string, unknown> };
@@ -54,8 +54,9 @@ export function validarServicio(servicios: Servicio[], d: Partial<Servicio>, idA
   return errores;
 }
 
-const TIPOS_OPERACION = ['crear_servicio', 'editar_servicio', 'pausar_servicio', 'publicar_servicio', 'borrar_servicio', 'crear_propuesta'];
+const TIPOS_OPERACION = ['crear_servicio', 'editar_servicio', 'pausar_servicio', 'publicar_servicio', 'borrar_servicio', 'crear_propuesta', 'cambiar_clave'];
 const TIPOS_REVISOR = ['aprobar_propuesta', 'rechazar_propuesta', 'ejecutar_cierre'];
+const NO_AUDITOR_NO_REVISOR = ['cambiar_clave'];
 
 function permiso(c: Comando, estado: Estado): string | null {
   if (c.perfil === 'Auditor') return 'El perfil Auditor es de solo lectura y no puede modificar datos';
@@ -64,10 +65,11 @@ function permiso(c: Comando, estado: Estado): string | null {
     return TIPOS_OPERACION.includes(c.tipo) ? null : 'Acción no permitida';
   }
   if (c.perfil === 'Revisor') {
+    if (NO_AUDITOR_NO_REVISOR.includes(c.tipo)) return null;
     if (!TIPOS_REVISOR.includes(c.tipo)) return 'El perfil Revisor solo aprueba, rechaza y ejecuta cierres';
     if (c.tipo !== 'ejecutar_cierre') {
       const p = estado.entidades.propuestas.find((x) => x.id === c.entidadId);
-      if (p && p.creador === c.actor) return 'Un revisor no puede aprobar ni decidir una propuesta creada por sí mismo';
+      if (p && p.creador === c.actor) return 'No podés aprobar una propuesta creada por vos mismo (separación de funciones)';
     }
     return null;
   }
@@ -82,10 +84,10 @@ export function aplicarComando(estado: Estado, c: Comando, almacen: Almacen): Re
     if (previo.tipo === c.tipo && igual(previo.datos, c.datos) && previo.resultado === 'aplicado') return { ok: true, idempotente: true, estado };
     return { ok: false, error: `El identificador de comando ${c.id} ya fue usado con otros datos o con otro tipo. No se guardó nada` };
   }
-  if (c.revisionEsperada !== estado.revision)
-    return { ok: false, conflicto: true, error: `Edición desactualizada: la revisión vigente es ${estado.revision} y enviaste ${c.revisionEsperada}. Actualizá los datos y volvé a revisar antes de confirmar` };
   const denegado = permiso(c, estado);
   if (denegado) return { ok: false, error: denegado };
+  if (c.revisionEsperada !== estado.revision)
+    return { ok: false, conflicto: true, error: `Edición desactualizada: la revisión vigente es ${estado.revision} y enviaste ${c.revisionEsperada}. Actualizá los datos y volvé a revisar antes de confirmar` };
 
   const n: Estado = structuredClone(estado);
   const { servicios, propuestas, cierres } = n.entidades;
@@ -99,10 +101,10 @@ export function aplicarComando(estado: Estado, c: Comando, almacen: Almacen): Re
     case 'crear_servicio': {
       const errores = validarServicio(servicios, d);
       if (errores.length) return falla(errores[0], errores);
-      const num = servicios.length + 1;
-      entidadId = c.entidadId || `SRV-${String(num).padStart(2, '0')}`;
-      servicios.push({ id: entidadId, nombre: d.nombre.trim().replace(/\s+/g, ' '), categoria: d.categoria ?? 'Curso práctico', detalle: d.detalle ?? '', precioLista: Number(d.precioLista), descuentoContado: Number(d.descuentoContado ?? 0), cuotas: d.cuotas ?? 1, promoDelMes: !!d.promoDelMes, estado: 'Borrador' });
-      detalle = { creado: entidadId };
+      const num = Math.max(0, ...servicios.map((x) => Number(x.id.replace(/\D/g, '')) || 0)) + 1;
+      entidadId = `SRV-${String(num).padStart(2, '0')}`;
+      servicios.push({ id: entidadId, nombre: d.nombre.trim().replace(/\s+/g, ' '), categoria: d.categoria ?? 'Curso práctico', detalle: d.detalle ?? '', precioLista: Number(d.precioLista), descuentoContado: Number(d.descuentoContado ?? 0), cuotas: d.cuotas ?? 1, promoDelMes: !!d.promoDelMes, estado: d.estado === 'Pausado' ? 'Pausado' : 'Publicado' });
+      detalle = { creado: entidadId, nombre: d.nombre, precioLista: Number(d.precioLista), descuentoContado: Number(d.descuentoContado ?? 0) };
       break;
     }
     case 'editar_servicio': {
@@ -111,8 +113,8 @@ export function aplicarComando(estado: Estado, c: Comando, almacen: Almacen): Re
       const nuevo = { ...s, ...d };
       const errores = validarServicio(servicios, nuevo, s.id);
       if (errores.length) return falla(errores[0], errores);
+      detalle = { cambios: d, antes: Object.fromEntries(Object.keys(d).map((k) => [k, (s as any)[k]])) };
       Object.assign(s, nuevo, { id: s.id });
-      detalle = { cambios: d };
       break;
     }
     case 'pausar_servicio':
@@ -127,6 +129,7 @@ export function aplicarComando(estado: Estado, c: Comando, almacen: Almacen): Re
       if (!d.confirmado) return falla('Confirmá el borrado para continuar');
       const i = servicios.findIndex((x) => x.id === c.entidadId);
       if (i < 0) return falla('El servicio no existe');
+      detalle = { borrado: servicios[i].nombre };
       servicios.splice(i, 1);
       break;
     }
@@ -137,7 +140,8 @@ export function aplicarComando(estado: Estado, c: Comando, almacen: Almacen): Re
       const errores = validarServicio(servicios, { ...s, ...d.cambios }, s.id);
       if (errores.length) return falla(errores[0], errores);
       entidadId = `PROP-${String(propuestas.length + 1).padStart(3, '0')}`;
-      propuestas.push({ id: entidadId, servicioId: s.id, estado: 'Pendiente', creador: c.actor, cambios: d.cambios ?? {}, motivo: c.motivo });
+      propuestas.push({ id: entidadId, servicioId: s.id, estado: 'Pendiente', creador: c.actor, cambios: d.cambios ?? {}, motivo: c.motivo, revisionBase: estado.revision });
+      detalle = { servicioId: s.id, cambios: d.cambios ?? {}, revisionBase: estado.revision };
       break;
     }
     case 'aprobar_propuesta':
@@ -151,11 +155,23 @@ export function aplicarComando(estado: Estado, c: Comando, almacen: Almacen): Re
         const nuevo = { ...s, ...p.cambios };
         const errores = validarServicio(servicios, nuevo, s.id);
         if (errores.length) return falla(errores[0], errores);
+        const antes = Object.fromEntries(Object.keys(p.cambios).map((k) => [k, (s as any)[k]]));
+        detalle = { servicioId: s.id, antes, despues: p.cambios, precioContadoAntes: precioContado(s.precioLista, s.descuentoContado), precioContadoDespues: precioContado(nuevo.precioLista, nuevo.descuentoContado) };
         Object.assign(s, nuevo, { id: s.id });
+      } else {
+        if (!c.motivo?.trim()) return falla('Indicá el motivo del rechazo');
+        detalle = { servicioId: p.servicioId, motivo: c.motivo };
       }
       p.estado = c.tipo === 'aprobar_propuesta' ? 'Aprobada' : 'Rechazada';
       p.decididaPor = c.actor;
       p.motivoDecision = c.motivo;
+      break;
+    }
+    case 'cambiar_clave': {
+      const nueva = String(d.clave ?? '').trim();
+      if (nueva.length < 4) return falla('La clave nueva debe tener al menos 4 caracteres');
+      n.configuracion.claveAccesoAdmin = nueva;
+      detalle = { claveCambiada: true };
       break;
     }
     case 'ejecutar_cierre': {

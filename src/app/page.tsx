@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { Modal } from '@/components/modal';
+import { Gestion, type Sesion } from '@/components/gestion';
 import { PanelAdmin } from '@/components/panel-admin';
 import {
   agruparCuotas,
@@ -31,7 +32,8 @@ const botonFuerte =
 
 export default function Home() {
   const [estado, setEstado] = useState<Estado | null>(null);
-  const [vista, setVista] = useState<'lista' | 'panel'>('lista');
+  const [vista, setVista] = useState<'lista' | 'gestion' | 'historial' | 'control'>('lista');
+  const [sesion, setSesion] = useState<Sesion | null>(null);
   const [pidiendoClave, setPidiendoClave] = useState(false);
   const [copiando, setCopiando] = useState<Servicio | null>(null);
   const [busqueda, setBusqueda] = useState('');
@@ -39,7 +41,25 @@ export default function Home() {
 
   useEffect(() => {
     setEstado(cargarEstado());
+    try {
+      const s = sessionStorage.getItem('academia_sesion');
+      if (s) setSesion(JSON.parse(s));
+    } catch {}
   }, []);
+
+  function entrar(s: Sesion) {
+    sessionStorage.setItem('academia_sesion', JSON.stringify(s));
+    setSesion(s);
+    setEstado(cargarEstado());
+    setPidiendoClave(false);
+    setVista('gestion');
+    window.scrollTo({ top: 0 });
+  }
+  function salir() {
+    sessionStorage.removeItem('academia_sesion');
+    setSesion(null);
+    setVista('lista');
+  }
 
   const publicados = useMemo(() => (estado?.entidades.servicios ?? []).filter((s) => s.estado === 'Publicado'), [estado]);
   const categorias = useMemo(() => [...new Set(publicados.map((s) => s.categoria))], [publicados]);
@@ -53,7 +73,7 @@ export default function Home() {
     });
   }, [publicados, busqueda, filtro]);
 
-  const enPanel = vista === 'panel' && estado !== null;
+  const enPanel = vista !== 'lista' && sesion !== null && estado !== null;
 
   return (
     <main>
@@ -79,7 +99,7 @@ export default function Home() {
               del Este
             </h1>
             <p className="mt-5 font-display text-xl font-bold sm:text-2xl">Lista de precios y gestión de cursos</p>
-            {!enPanel ? (
+            {!sesion ? (
               <button
                 className={`${botonFuerte} mt-8 bg-accent text-ink hover:bg-surface`}
                 onClick={() => setPidiendoClave(true)}
@@ -108,6 +128,28 @@ export default function Home() {
         </p>
       </section>
 
+      {sesion ? (
+        <nav aria-label="Vistas del panel" className="border-b-2 border-ink bg-surface">
+          <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-2 px-4 py-3 sm:px-6">
+            {([['lista', 'Lista Asesores'], ['gestion', 'Gestión y Propuestas'], ['historial', 'Historial y Auditoría'], ['control', 'Control y Exportación']] as const).map(([k, l]) => (
+              <button
+                aria-current={vista === k ? 'page' : undefined}
+                className={`rounded-md border-2 border-ink px-4 py-2 font-bold ${vista === k ? 'bg-ink text-white' : 'bg-surface hover:bg-paper'}`}
+                key={k}
+                onClick={() => { setEstado(cargarEstado()); setVista(k); }}
+                type="button"
+              >
+                {l}
+              </button>
+            ))}
+            <span className="ml-auto text-sm font-bold">Activo: {sesion.actor}</span>
+            <button className="rounded-md border-2 border-ink bg-accent px-4 py-2 font-bold hover:bg-surface" onClick={salir} type="button">
+              Cambiar perfil / Salir
+            </button>
+          </div>
+        </nav>
+      ) : null}
+
       <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16" id="lista">
         {estado === null ? (
           <div aria-label="Cargando la lista" className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
@@ -115,8 +157,15 @@ export default function Home() {
               <div className="h-80 animate-pulse rounded-card bg-surface" key={i} />
             ))}
           </div>
-        ) : enPanel ? (
+        ) : enPanel && vista === 'gestion' ? (
+          <Gestion estado={estado} onEstado={setEstado} recargar={() => setEstado(cargarEstado())} sesion={sesion} />
+        ) : enPanel && vista === 'historial' ? (
           <PanelAdmin estado={estado} onVolver={() => setVista('lista')} />
+        ) : enPanel ? (
+          <div>
+            <h2 className="font-display text-3xl font-black tracking-tight sm:text-4xl">Control y Exportación</h2>
+            <p className="mt-3 text-mute">Esta pantalla se habilita en la próxima etapa.</p>
+          </div>
         ) : (
           <>
             <div className="flex flex-wrap items-end justify-between gap-6">
@@ -240,23 +289,24 @@ export default function Home() {
       </div>
 
       {pidiendoClave && estado ? (
-        <ModalClave
-          onCerrar={() => setPidiendoClave(false)}
-          onEntrar={() => {
-            setEstado(cargarEstado());
-            setPidiendoClave(false);
-            setVista('panel');
-            window.scrollTo({ top: 0 });
-          }}
-        />
+        <ModalClave onCerrar={() => setPidiendoClave(false)} onEntrar={entrar} />
       ) : null}
       {copiando ? <ModalCopiar onCerrar={() => setCopiando(null)} servicio={copiando} /> : null}
     </main>
   );
 }
 
-function ModalClave({ onCerrar, onEntrar }: { onCerrar: () => void; onEntrar: () => void }) {
+const ACTORES: { actor: string; perfil: Sesion['perfil'] }[] = [
+  { actor: 'Laura (Operación)', perfil: 'Operación' },
+  { actor: 'Martín (Operación)', perfil: 'Operación' },
+  { actor: 'Carlos (Revisor)', perfil: 'Revisor' },
+  { actor: 'Sofía (Auditor)', perfil: 'Auditor' },
+];
+
+function ModalClave({ onCerrar, onEntrar }: { onCerrar: () => void; onEntrar: (s: Sesion) => void }) {
   const [clave, setClave] = useState('');
+  const [actor, setActor] = useState('');
+  const [errorActor, setErrorActor] = useState(false);
   const [error, setError] = useState(false);
 
   return (
@@ -264,7 +314,9 @@ function ModalClave({ onCerrar, onEntrar }: { onCerrar: () => void; onEntrar: ()
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (clave === cargarEstado().configuracion.claveAccesoAdmin) onEntrar();
+          const a = ACTORES.find((x) => x.actor === actor);
+          if (!a) { setErrorActor(true); return; }
+          if (clave === cargarEstado().configuracion.claveAccesoAdmin) onEntrar(a);
           else setError(true);
         }}
       >
@@ -285,6 +337,24 @@ function ModalClave({ onCerrar, onEntrar }: { onCerrar: () => void; onEntrar: ()
           type="password"
           value={clave}
         />
+        <label className="mt-4 block text-sm font-bold" htmlFor="actor">
+          Actor y perfil de demo
+        </label>
+        <select
+          className="mt-1 w-full rounded-md border-2 border-ink bg-surface px-4 py-3"
+          id="actor"
+          onChange={(e) => { setActor(e.target.value); setErrorActor(false); }}
+          value={actor}
+        >
+          <option value="">Elegí un actor…</option>
+          {ACTORES.map((a) => (
+            <option key={a.actor} value={a.actor}>{a.actor.replace(' (', ' — ').replace(')', '')}</option>
+          ))}
+        </select>
+        {errorActor ? <p className="mt-2 text-sm font-bold" role="alert">Elegí con qué actor y perfil vas a ingresar.</p> : null}
+        <p className="mt-4 rounded-md border-2 border-ink bg-paper px-3 py-2 text-sm font-bold">
+          Entorno de demostración local con datos sintéticos en este navegador. No constituye autenticación real ni bloqueo simultáneo entre computadoras.
+        </p>
         {error ? (
           <p className="mt-2 text-sm font-bold text-ink" id="clave-error" role="alert">
             La clave no es correcta. Revisá que esté bien escrita e intentá de nuevo.
