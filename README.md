@@ -1,30 +1,36 @@
-# Totalum project
+# Academia del Este — Lista de Precios y Gestión de Cursos
 
-A Next.js 16 app built with [Totalum](https://totalum.app). It runs on Cloudflare Workers; its data is a D1 (SQLite)
-database used through Drizzle ORM (`src/db/`), with better-auth for accounts (`src/lib/auth.ts`).
+Aplicación web interna para asesores comerciales y administración de **Academia del Este** (Argentina). Permite consultar tarifas actualizadas en modo solo lectura para atención por WhatsApp y gestionar cursos, propuestas de ajuste de precios, auditoría inmutable, conciliación y respaldos versionados sin servicios externos.
 
-## Run locally
+## 1. Cómo ejecutar el proyecto localmente
 
-You need Node 22 and npm. On Linux, the local Workers runtime needs glibc 2.35 or newer (Ubuntu 22.04, Debian 12).
+1. Cloná o descargá este repositorio en tu computadora.
+2. Instalá las dependencias:
+   ```bash
+   npm install
+   ```
+3. Iniciá el servidor de desarrollo:
+   ```bash
+   npm run dev
+   ```
+4. Abrí la URL local indicada en la consola en el navegador.
 
-1. Download the source code and its `.env` from Totalum (with the VCaaS API: `GET /api/v1/vcaas/projects/<id>/source-code`
-   and `GET …/github/env`, whose `envDev` is the file), and put the `.env` in the project folder.
-2. `npm ci`
-3. `npm run dev`, then open <http://localhost:3100> (`PORT=4000 npm run dev` for another port).
+## 2. Cómo se preparan y gestionan los datos sintéticos
 
-`npm run dev` first applies the migrations in `drizzle/` to the database it serves: with `TOTALUM_ENV=dev` and a
-`TOTALUM_PROJECT_KEY` (the `.env` above), your project's dev database on Totalum, the one the preview shows, so rows
-you create there appear in the preview too; otherwise (a project without a dev database, or no key) a local database
-in `.wrangler/`, which never reaches Totalum (to start it again empty, stop the server and delete `.wrangler/state`).
+- La aplicación persiste su estado completo en una única clave de `localStorage` llamada **`academia_del_este_v2`** con formato versionado (`schemaVersion: 2`).
+- **Carga automática de semilla:** Al iniciar por primera vez (cuando la clave `academia_del_este_v2` no existe en `localStorage`), el sistema carga automáticamente:
+  - **8 servicios iniciales** (`SRV-01` a `SRV-08`: 6 en estado `Publicado` visibles para asesores y 2 en estado `Pausado` visibles solo en administración).
+  - **Historial completo de eventos y comandos** con revisiones consecutivas, propuestas de ajuste (`PROP-001` a `PROP-003`) y cierre registrado (`CIE-001`).
+- **Reinicio de datos sintéticos:** Desde la pantalla **Control y Exportación** -> *Verificación de Reglas de Dominio y Casos Adversos* -> **«Restaurar datos semilla iniciales (Reset demo)»** (con perfil *Operación* o *Revisor*), se regenera el estado inicial sintético.
 
-The built-in integrations (e-mail, AI, files, …) call Totalum with `TOTALUM_PROJECT_KEY` from `.env` and are billed
-to your project as usual. Without a key the app still runs, and only those calls fail with `SDK_NOT_CONFIGURED`.
+## 3. Acceso al Panel y cómo cambiar la clave
 
-## Commands
-
-- `npm run db:generate`: after you change `src/db/schema.ts`, writes the next migration to `drizzle/`. The next
-  `npm run dev` applies it (or run `npm run db:migrate`, or `npm run db:migrate -- --local` for the local database).
-- `npm run db:migrate`: applies the migrations to the project's database on Totalum, the one `TOTALUM_ENV` in `.env`
-  selects (`dev` or `live`).
-- `npm run build:preview`: the Cloudflare Workers build Totalum deploys. `npx wrangler dev` then serves that build on
-  <http://localhost:8787> in the Workers runtime, on the local database in `.wrangler/`.
+- **Entorno local de demostración:** El acceso administrativo utiliza una validación local en el navegador con datos sintéticos (no constituye autenticación real ni exclusión simultánea entre distintas computadoras).
+- **Clave inicial por defecto:** `ESTE2026`
+- **Perfiles de demostración disponibles al ingresar:**
+  - **Operación** (*Laura / Martín*): alta, edición, pausado/publicación, borrado con confirmación y creación de propuestas de ajuste.
+  - **Revisor** (*Carlos*): aprobación o rechazo de propuestas y ejecución de cierres (el motor prohíbe aprobar propuestas creadas por el mismo actor).
+  - **Auditor** (*Sofía*): consulta de historial inmutable, conciliación y exportación (sin permisos de escritura).
+- **Cómo cambiar la clave del panel:**
+  1. **Desde la interfaz:** Ingresá al panel con perfil **Operación** o **Revisor**, abrí la sección de configuración de clave en **Gestión y Propuestas**, ingresá la nueva clave y guardá los cambios (se persiste en `configuracion.claveAccesoAdmin` dentro de `academia_del_este_v2`).
+  2. **Desde el código fuente (semilla inicial):** Editá el valor de `claveAccesoAdmin` (por defecto `"ESTE2026"`) en el archivo de dominio/semilla antes de inicializar el almacenamiento.
