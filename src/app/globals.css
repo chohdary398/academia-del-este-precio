@@ -1,9 +1,17 @@
 @import 'tailwindcss';
 
-/* The project's design tokens (colours, radius): see _system-docs/design.md. */
+/* Paleta de Academia del Este. `mute` es un gris más oscuro que el #8A9599 del dueño, para texto legible sobre blanco;
+   `line` es el #8A9599 original, para bordes y detalles. */
 @theme {
-  --color-brand: oklch(0.55 0.2 260);
-  --color-accent: oklch(0.75 0.15 70);
+  --color-brand: #1e7f4f;
+  --color-brand-dark: #145a37;
+  --color-accent: #f2c230;
+  --color-paper: #eef0ef;
+  --color-surface: #ffffff;
+  --color-ink: #232829;
+  --color-mute: #596466;
+  --color-line: #8a9599;
+  --radius-card: 0.5rem;
 }
 
 /*
@@ -14,4 +22,26 @@
 @theme inline {
   --font-sans: var(--font-body, ui-sans-serif), system-ui, sans-serif;
   --font-display: var(--font-heading, var(--font-body, ui-sans-serif)), system-ui, sans-serif;
+}
+
+body {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 3px solid var(--color-ink);
+  outline-offset: 3px;
+}
+.on-dark :focus-visible {
+  outline-color: var(--color-surface);
+}
+dialog :focus-visible {
+  outline-color: var(--color-ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
 }

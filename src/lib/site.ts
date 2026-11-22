@@ -1,7 +1,7 @@
 // The app's name and header links, in one place: the header, the footer and every page title read them.
 export const site = {
-  name: 'New Totalum app',
-  description: 'Built with Totalum',
+  name: 'Academia del Este',
+  description: 'Lista de precios de cursos y clases de manejo de la Academia del Este, con precio contado y cuotas sin interés.',
   /** The logo image's URL (the user's file): the header, the footer and the browser icon show it. Empty: the name alone. */
   logo: '',
   /**
@@ -34,4 +34,4 @@ export const site = {
 };
 
 /** The header and footer appear once the app has something to put in them: links or accounts (a one-page "hello" has neither). */
-export const hasShell = () => site.accounts || site.nav.length > 0;
+export const hasShell = () => true;
