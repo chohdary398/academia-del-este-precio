@@ -59,6 +59,10 @@ function useEjecutor(estado: Estado, sesion: Sesion, onEstado: (e: Estado) => vo
       onEstado(r.estado);
       return { ok: true, estado: r.estado };
     }
+    if (r.estado) {
+      idRef.current = null;
+      onEstado(r.estado);
+    }
     return { ok: false, error: r.error };
   };
 }

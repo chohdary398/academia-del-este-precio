@@ -20,7 +20,7 @@ export type Estado = {
   eventos: Evento[]; comandosAplicados: ComandoAplicado[];
 };
 export type Comando = { id: string; tipo: string; entidadId: string; actor: string; perfil: Perfil; instante: string; revisionEsperada: number; datos?: any; motivo?: string };
-export type Resultado = { ok: true; idempotente?: boolean; estado: Estado } | { ok: false; error: string; errores?: string[]; conflicto?: boolean };
+export type Resultado = { ok: true; idempotente?: boolean; estado: Estado } | { ok: false; error: string; errores?: string[]; conflicto?: boolean; estado?: Estado };
 type Almacen = Pick<Storage, 'setItem'>;
 
 const norm = (s: string) => s.trim().replace(/\s+/g, ' ').toLowerCase();
@@ -78,7 +78,21 @@ function permiso(c: Comando, estado: Estado): string | null {
 
 const igual = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
+/** Registra el comando rechazado en el log (sin evento ni cambio de revisión). Nunca borra ni modifica nada previo. */
 export function aplicarComando(estado: Estado, c: Comando, almacen: Almacen): Resultado {
+  const r = aplicarInterno(estado, c, almacen);
+  if (r.ok || r.error.startsWith('No se pudo guardar') || r.error.includes('ya fue usado')) return r;
+  const n: Estado = structuredClone(estado);
+  n.comandosAplicados.push({ ...c, datos: c.datos, motivo: c.motivo ?? '', resultado: 'rechazado', error: r.error });
+  try {
+    almacen.setItem(CLAVE_STORAGE, JSON.stringify(n));
+  } catch {
+    return r;
+  }
+  return { ...r, estado: n };
+}
+
+function aplicarInterno(estado: Estado, c: Comando, almacen: Almacen): Resultado {
   const previo = estado.comandosAplicados.find((x) => x.id === c.id);
   if (previo) {
     if (previo.tipo === c.tipo && igual(previo.datos, c.datos) && previo.resultado === 'aplicado') return { ok: true, idempotente: true, estado };
@@ -104,7 +118,7 @@ export function aplicarComando(estado: Estado, c: Comando, almacen: Almacen): Re
       const num = Math.max(0, ...servicios.map((x) => Number(x.id.replace(/\D/g, '')) || 0)) + 1;
       entidadId = `SRV-${String(num).padStart(2, '0')}`;
       servicios.push({ id: entidadId, nombre: d.nombre.trim().replace(/\s+/g, ' '), categoria: d.categoria ?? 'Curso práctico', detalle: d.detalle ?? '', precioLista: Number(d.precioLista), descuentoContado: Number(d.descuentoContado ?? 0), cuotas: d.cuotas ?? 1, promoDelMes: !!d.promoDelMes, estado: d.estado === 'Pausado' ? 'Pausado' : 'Publicado' });
-      detalle = { creado: entidadId, nombre: d.nombre, precioLista: Number(d.precioLista), descuentoContado: Number(d.descuentoContado ?? 0) };
+      detalle = { creado: entidadId, nombre: d.nombre, precioLista: Number(d.precioLista), descuentoContado: Number(d.descuentoContado ?? 0), despues: { precioLista: Number(d.precioLista), descuentoContado: Number(d.descuentoContado ?? 0), estado: servicios[servicios.length - 1].estado } };
       break;
     }
     case 'editar_servicio': {
@@ -113,7 +127,7 @@ export function aplicarComando(estado: Estado, c: Comando, almacen: Almacen): Re
       const nuevo = { ...s, ...d };
       const errores = validarServicio(servicios, nuevo, s.id);
       if (errores.length) return falla(errores[0], errores);
-      detalle = { cambios: d, antes: Object.fromEntries(Object.keys(d).map((k) => [k, (s as any)[k]])) };
+      detalle = { cambios: d, despues: d, antes: Object.fromEntries(Object.keys(d).map((k) => [k, (s as any)[k]])) };
       Object.assign(s, nuevo, { id: s.id });
       break;
     }
@@ -121,15 +135,16 @@ export function aplicarComando(estado: Estado, c: Comando, almacen: Almacen): Re
     case 'publicar_servicio': {
       const s = servicios.find((x) => x.id === c.entidadId);
       if (!s) return falla('El servicio no existe');
+      const estadoAntes = s.estado;
       s.estado = c.tipo === 'pausar_servicio' ? 'Pausado' : 'Publicado';
-      detalle = { estado: s.estado };
+      detalle = { estado: s.estado, antes: { estado: estadoAntes }, despues: { estado: s.estado } };
       break;
     }
     case 'borrar_servicio': {
       if (!d.confirmado) return falla('Confirmá el borrado para continuar');
       const i = servicios.findIndex((x) => x.id === c.entidadId);
       if (i < 0) return falla('El servicio no existe');
-      detalle = { borrado: servicios[i].nombre };
+      detalle = { borrado: servicios[i].nombre, antes: { precioLista: servicios[i].precioLista, estado: servicios[i].estado } };
       servicios.splice(i, 1);
       break;
     }

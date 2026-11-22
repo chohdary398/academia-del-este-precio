@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { Modal } from '@/components/modal';
 import { Gestion, type Sesion } from '@/components/gestion';
-import { PanelAdmin } from '@/components/panel-admin';
+import { Historial } from '@/components/historial';
 import {
   agruparCuotas,
   calcularCuotas,
@@ -79,7 +79,7 @@ export default function Home() {
     <main>
       {/* Encabezado institucional */}
       <section className="on-dark relative overflow-hidden bg-brand text-white">
-        <div aria-hidden className="absolute -right-10 -top-10 size-36 rounded-full bg-accent md:hidden" />
+        <div aria-hidden className="absolute -right-10 -top-10 hidden size-36 rounded-full bg-accent sm:block md:hidden" />
         <div className="mx-auto grid max-w-6xl items-center gap-10 px-4 pb-16 pt-12 sm:px-6 sm:pt-16 md:grid-cols-[1.4fr_1fr] lg:pb-20 lg:pt-20">
           <div className="min-w-0">
             <p className="inline-flex items-center gap-2 rounded-sm bg-surface px-3 py-1.5 text-sm font-bold text-ink">
@@ -160,7 +160,7 @@ export default function Home() {
         ) : enPanel && vista === 'gestion' ? (
           <Gestion estado={estado} onEstado={setEstado} recargar={() => setEstado(cargarEstado())} sesion={sesion} />
         ) : enPanel && vista === 'historial' ? (
-          <PanelAdmin estado={estado} onVolver={() => setVista('lista')} />
+          <Historial estado={estado} />
         ) : enPanel ? (
           <div>
             <h2 className="font-display text-3xl font-black tracking-tight sm:text-4xl">Control y Exportación</h2>

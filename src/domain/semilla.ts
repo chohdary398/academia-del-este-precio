@@ -36,11 +36,11 @@ export function estadoSemilla(): Estado {
       ],
     },
     eventos: [
-      evt(1, 'crear_servicio', 'SRV-01', 'Laura (Operación)', { precioLista: 260000, descuentoContado: 30000 }),
-      evt(2, 'publicar_servicio', 'SRV-02', 'Laura (Operación)', { estado: 'Publicado' }),
-      evt(3, 'editar_servicio', 'SRV-06', 'Martín (Operación)', { cambios: { descuentoContado: 5000 }, precioAnterior: 45000 }),
-      evt(4, 'pausar_servicio', 'SRV-07', 'Martín (Operación)', { estado: 'Pausado' }),
-      evt(5, 'pausar_servicio', 'SRV-08', 'Laura (Operación)', { estado: 'Pausado' }),
+      evt(1, 'crear_servicio', 'SRV-01', 'Laura (Operación)', { precioLista: 260000, descuentoContado: 30000, despues: { precioLista: 260000, descuentoContado: 30000, estado: 'Borrador' } }),
+      evt(2, 'publicar_servicio', 'SRV-02', 'Laura (Operación)', { estado: 'Publicado', antes: { estado: 'Borrador' }, despues: { estado: 'Publicado' } }),
+      evt(3, 'editar_servicio', 'SRV-06', 'Martín (Operación)', { cambios: { descuentoContado: 5000 }, antes: { descuentoContado: 0 }, despues: { descuentoContado: 5000 } }),
+      evt(4, 'pausar_servicio', 'SRV-07', 'Martín (Operación)', { estado: 'Pausado', antes: { estado: 'Publicado' }, despues: { estado: 'Pausado' } }),
+      evt(5, 'pausar_servicio', 'SRV-08', 'Laura (Operación)', { estado: 'Pausado', antes: { estado: 'Publicado' }, despues: { estado: 'Pausado' } }),
     ],
     comandosAplicados: [
       cmd(1, 'crear_servicio', 'SRV-01', 'Laura (Operación)', 'Operación', { precioLista: 260000 }, 'Alta del curso', 'aplicado', { revisionResultante: 1 }),
