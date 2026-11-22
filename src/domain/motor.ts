@@ -118,7 +118,7 @@ function aplicarInterno(estado: Estado, c: Comando, almacen: Almacen): Resultado
       const num = Math.max(0, ...servicios.map((x) => Number(x.id.replace(/\D/g, '')) || 0)) + 1;
       entidadId = `SRV-${String(num).padStart(2, '0')}`;
       servicios.push({ id: entidadId, nombre: d.nombre.trim().replace(/\s+/g, ' '), categoria: d.categoria ?? 'Curso práctico', detalle: d.detalle ?? '', precioLista: Number(d.precioLista), descuentoContado: Number(d.descuentoContado ?? 0), cuotas: d.cuotas ?? 1, promoDelMes: !!d.promoDelMes, estado: d.estado === 'Pausado' ? 'Pausado' : 'Publicado' });
-      detalle = { creado: entidadId, nombre: d.nombre, precioLista: Number(d.precioLista), descuentoContado: Number(d.descuentoContado ?? 0), despues: { precioLista: Number(d.precioLista), descuentoContado: Number(d.descuentoContado ?? 0), estado: servicios[servicios.length - 1].estado } };
+      detalle = { creado: entidadId, nombre: d.nombre, precioLista: Number(d.precioLista), descuentoContado: Number(d.descuentoContado ?? 0), despues: { precioLista: Number(d.precioLista), descuentoContado: Number(d.descuentoContado ?? 0), estado: servicios[servicios.length - 1].estado, promoDelMes: !!d.promoDelMes } };
       break;
     }
     case 'editar_servicio': {

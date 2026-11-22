@@ -14,6 +14,7 @@ import {
   type Perfil,
   type Servicio,
 } from '@/domain/motor';
+import { almacenApp } from '@/domain/store';
 
 export type Sesion = { actor: string; perfil: Perfil };
 const CATEGORIAS = ['Curso práctico', 'Clase suelta', 'Teórico virtual', 'Simulador'];
@@ -53,7 +54,7 @@ function useEjecutor(estado: Estado, sesion: Sesion, onEstado: (e: Estado) => vo
     if (!idRef.current || idRef.current.clave !== clave)
       idRef.current = { clave, id: `CMD-${Date.now().toString(36).toUpperCase()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}` };
     const c: Comando = { id: idRef.current.id, tipo, entidadId, actor: sesion.actor, perfil: sesion.perfil, instante: new Date().toISOString(), revisionEsperada: estado.revision, datos, motivo };
-    const r = aplicarComando(estado, c, localStorage);
+    const r = aplicarComando(estado, c, almacenApp);
     if (r.ok) {
       idRef.current = null;
       onEstado(r.estado);

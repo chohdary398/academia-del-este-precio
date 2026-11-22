@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Modal } from '@/components/modal';
 import { Gestion, type Sesion } from '@/components/gestion';
 import { Historial } from '@/components/historial';
+import { Control } from '@/components/control';
 import {
   agruparCuotas,
   calcularCuotas,
@@ -161,11 +162,8 @@ export default function Home() {
           <Gestion estado={estado} onEstado={setEstado} recargar={() => setEstado(cargarEstado())} sesion={sesion} />
         ) : enPanel && vista === 'historial' ? (
           <Historial estado={estado} />
-        ) : enPanel ? (
-          <div>
-            <h2 className="font-display text-3xl font-black tracking-tight sm:text-4xl">Control y Exportación</h2>
-            <p className="mt-3 text-mute">Esta pantalla se habilita en la próxima etapa.</p>
-          </div>
+        ) : enPanel && sesion ? (
+          <Control estado={estado} onEstado={setEstado} sesion={sesion} />
         ) : (
           <>
             <div className="flex flex-wrap items-end justify-between gap-6">

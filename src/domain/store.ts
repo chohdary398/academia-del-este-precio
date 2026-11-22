@@ -15,3 +15,17 @@ export function cargarEstado(): Estado {
     return estadoSemilla();
   }
 }
+
+let fallarProximoGuardado = false;
+export const simularFalloProximoGuardado = () => { fallarProximoGuardado = true; };
+export const falloPendiente = () => fallarProximoGuardado;
+/** Almacén real de la app; permite hacer fallar un único guardado para verificar el reintento. */
+export const almacenApp = {
+  setItem(k: string, v: string) {
+    if (fallarProximoGuardado) {
+      fallarProximoGuardado = false;
+      throw new Error('almacenamiento lleno (simulado)');
+    }
+    localStorage.setItem(k, v);
+  },
+};
